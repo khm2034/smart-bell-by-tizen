@@ -1,0 +1,13 @@
+[ethernet_b827eb0b6458_cable]
+Name=Wired
+AutoConnect=true
+Modified=2016-07-25T19:49:54.191535Z
+IPv4.method=manual
+IPv6.method=auto
+IPv6.privacy=disabled
+IPv4.DHCP.LastAddress=10.113.216.216
+Nameservers.IPv4method=dhcp
+IPv4.netmask_prefixlen=24
+IPv4.local_address=10.113.62.234
+IPv4.gateway=10.113.62.1
+#connmanctl config ethernet_b827eb0b6458_cable --ipv4 manual 10.113.62.234 255.255.255.0 10.113.62.1

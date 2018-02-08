@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<manifest xmlns="http://tizen.org/ns/packages" api-version="4.0" package="org.tizen.position-finder-server" version="1.0.0">
+    <profile name="iot-headless"/>
+    <service-application appid="org.tizen.position-finder-server" exec="position-finder-server" multiple="false" nodisplay="true" taskmanage="false" type="capp">
+        <label>position-finder-server</label>
+        <icon>position-finder-server.png</icon>
+    </service-application>
+    <privileges>
+        <privilege>http://tizen.org/privilege/appdir.shareddata</privilege>
+        <privilege>http://tizen.org/privilege/network.get</privilege>
+        <privilege>http://tizen.org/privilege/internet</privilege>
+        <privilege>http://tizen.org/privilege/peripheralio</privilege>
+    </privileges>
+</manifest>

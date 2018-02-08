@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<manifest xmlns="http://tizen.org/ns/packages" api-version="4.0" package="@ORG_PREFIX@.@PROJECT_NAME@" version="1.0.0">
+    <profile name="mobile"/>
+    <author email="jinny.yoon@samsung.com" href="www.samsung.com">Jin Yoon</author>
+    <author email="gs86.lee@samsung.com" href="www.samsung.com">Geunsun Lee</author>
+    <author email="ey928.lee@samsung.com" href="www.samsung.com">Eunyoung Lee</author>
+    <author email="junkyu.han@samsung.com" href="www.samsung.com">Junkyu Han</author>
+    <service-application appid="@ORG_PREFIX@.@PROJECT_NAME@" auto-restart="false" exec="@PROJECT_NAME@" multiple="false" nodisplay="true" on-boot="false" taskmanage="false" type="capp">
+        <label>@APP_LABEL@</label>
+        <icon>@PROJECT_NAME@.png</icon>
+    </service-application>
+    <privileges>
+		<privilege>http://tizen.org/privilege/network.get</privilege>
+		<privilege>http://tizen.org/privilege/internet</privilege>
+		<privilege>http://tizen.org/privilege/peripheralio</privilege>
+		<privilege>http://tizen.org/privilege/camera</privilege>
+    </privileges>
+</manifest>

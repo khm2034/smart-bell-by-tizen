@@ -165,19 +165,23 @@ static Eina_Bool control_sensors_cb(void *data)
 	//_D("Detected distance : %lf", dist);
 #endif
 
-#if 1 // steoper motor
-	// GND, OE : ground , SCR : 5pin, SDA : 3pin,  vcc v+ : 5v
-	if(cnt % 5 == 0)
-		ret = resource_set_stepper_motor_driver_L298N_speed(0, 0);
-	else
-		ret = resource_set_stepper_motor_driver_L298N_speed(0, 3000);
-	cnt++;
+//#if 1 // steoper motor
+//	// GND, OE : ground , SCR : 5pin, SDA : 3pin,  vcc v+ : 5v
+//	if(cnt % 5 == 0)
+//		ret = resource_set_stepper_motor_driver_L298N_speed(0, 0);
+//	else
+//		ret = resource_set_stepper_motor_driver_L298N_speed(0, 1000);
+//	cnt++;
+//
+//	if (ret != 0) _E("Cannot read sensor value");
+//
+//	//_D("Detected distance : %lf", dist);
+//#endif
 
-	if (ret != 0) _E("Cannot read sensor value");
-
-	//_D("Detected distance : %lf", dist);
+#if 1
+	_D("read key matrix");
+	resource_read_key_matrix();
 #endif
-
 	/* This is example, get value from sensors first */
 //	if (connectivity_notify_int(ad->resource_info, "Motion", value) == -1)
 //		_E("Cannot notify message");

@@ -42,5 +42,6 @@
 #include "resource/resource_servo_motor.h"
 #include "resource/resource_PCA9685.h"
 #include "resource/resource_motor_driver_L298N.h"
+#include "resource/resource_key_matrix.h"
 
 #endif /* __POSITION_FINDER_RESOURCE_H__ */

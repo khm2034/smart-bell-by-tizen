@@ -179,8 +179,11 @@ static Eina_Bool control_sensors_cb(void *data)
 //#endif
 
 #if 1
-	_D("read key matrix");
-	resource_read_key_matrix();
+	char getch=NULL;
+	//_D("read key matrix");
+	resource_read_key_matrix(&getch);
+	if(getch != NULL)
+		_D("read [%c]key", getch);
 #endif
 	/* This is example, get value from sensors first */
 //	if (connectivity_notify_int(ad->resource_info, "Motion", value) == -1)

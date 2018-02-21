@@ -35,7 +35,6 @@ void resource_close_key_matrix()
 	int i=0;
 	for(i = 0; i < 4; i++){
 		if(g_km_h.row_pin_h[i]){
-			peripheral_gpio_unset_interrupted_cb(g_km_h.row_pin_h[i]);
 			peripheral_gpio_close(g_km_h.row_pin_h[i]);
 			g_km_h.row_pin_h[i] = NULL;
 		}
@@ -62,20 +61,6 @@ static int __set_default_gpio_by_key_matrix()
 	return 0;
 }
 
-//static void _resource_read_key_matrix_cb(peripheral_gpio_h gpio, peripheral_error_e error, void *user_data)
-//{
-//	int row_num = *((int*)(user_data));
-//	push_row = row_num;
-//	_D("click push_row[%d]", push_row);
-//}
-//
-//static void _resource_read_key_matrix_cb2(peripheral_gpio_h gpio, peripheral_error_e error, void *user_data)
-//{
-//	int col_num = *((int*)(user_data));
-//	push_col = col_num;
-//	_D("click push_col[%d]", push_col);
-//}
-
 static int __init_key_matrix()
 {
 	int ret = 0;
@@ -86,12 +71,8 @@ static int __init_key_matrix()
 	for(i = 0 ; i < 4 ; i++){
 		ret = peripheral_gpio_open(g_km_h.row_pin[i], &g_km_h.row_pin_h[i]);
 		if (ret == PERIPHERAL_ERROR_NONE){
-//			peripheral_gpio_set_direction(g_km_h.row_pin_h[i],
-//						PERIPHERAL_GPIO_DIRECTION_OUT_INITIALLY_HIGH);
 			peripheral_gpio_set_direction(g_km_h.row_pin_h[i],
 				PERIPHERAL_GPIO_DIRECTION_IN);
-//			peripheral_gpio_set_edge_mode(g_km_h.row_pin_h[i], PERIPHERAL_GPIO_EDGE_BOTH);
-//			peripheral_gpio_set_interrupted_cb(g_km_h.row_pin_h[i], _resource_read_key_matrix_cb, (void*)&row_num[i]);
 		}
 		else {
 			_E("failed to open gpio row%d[%u] pin", i, g_km_h.row_pin[i]);
@@ -101,11 +82,7 @@ static int __init_key_matrix()
 		ret = peripheral_gpio_open(g_km_h.col_pin[i], &g_km_h.col_pin_h[i]);
 		if (ret == PERIPHERAL_ERROR_NONE){
 			peripheral_gpio_set_direction(g_km_h.col_pin_h[i],
-				PERIPHERAL_GPIO_DIRECTION_OUT_INITIALLY_HIGH);
-//			peripheral_gpio_set_direction(g_km_h.col_pin_h[i],
-//						PERIPHERAL_GPIO_DIRECTION_IN);
-//			peripheral_gpio_set_edge_mode(g_km_h.col_pin_h[i], PERIPHERAL_GPIO_EDGE_BOTH);
-//			peripheral_gpio_set_interrupted_cb(g_km_h.col_pin_h[i], _resource_read_key_matrix_cb2, (void*)&col_num[i]);
+				PERIPHERAL_GPIO_DIRECTION_OUT_INITIALLY_LOW);
 		}
 		else {
 			_E("failed to open gpio col%d[%u] pin", i, g_km_h.col_pin[i]);
@@ -154,7 +131,7 @@ int resource_set_key_matrix_gpio(unsigned int row1, unsigned int row2, unsigned 
 	return 0;
 }
 
-int resource_read_key_matrix()
+int resource_read_key_matrix(char* getch)
 {
 	uint32_t read;
 	int i;
@@ -163,35 +140,34 @@ int resource_read_key_matrix()
 	if(g_km_h.key_matrix_state != KEY_MATRIX_READY)
 		__init_key_matrix();
 
-//	if(push_col != -1 && push_row != -1)
-//		_D("press [%c] key!!", key_matrix_value[push_row][push_col]);
-//
-//	push_col = push_row = -1;
-
 	for(i = 0; i < 4; i++){
-		ret = peripheral_gpio_write(g_km_h.col_pin_h[i], 0);
+		ret = peripheral_gpio_write(g_km_h.col_pin_h[i], 1);
 		if(ret != PERIPHERAL_ERROR_NONE){
 			_E("failed to set value[0] col[%d] pin", i);
 			ret = -1;
 			return ret;
 		}
-
+		usleep(10);
 		for(j = 0; j < 4; j++){
 			peripheral_gpio_read(g_km_h.row_pin_h[j], &read);
-			if(read == 0){
-				_D("press [%c] key!!", key_matrix_value[j][i]);
+			usleep(10);
+			//_D("col[%d], row[%d], read[%d]", i, j, read);
+			if(read == 1){
+				//_D("press [%c] key!!", key_matrix_value[j][i]);
+				*getch = key_matrix_value[j][i];
 				do{
 					peripheral_gpio_read(g_km_h.row_pin_h[j], &read);
-				}while(read == 0);
+				}while(read == 1);
 			}
 		}
-
-		ret = peripheral_gpio_write(g_km_h.col_pin_h[i], 1);
+		usleep(10);
+		ret = peripheral_gpio_write(g_km_h.col_pin_h[i], 0);
 		if(ret != PERIPHERAL_ERROR_NONE){
 			_E("failed to set value[1] col[%d] pin", i);
 			ret = -1;
 			return ret;
 		}
+		usleep(10);
 	}
 
 	return 0;

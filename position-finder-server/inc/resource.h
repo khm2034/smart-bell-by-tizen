@@ -31,6 +31,7 @@
 #include "resource/resource_touch_sensor.h"
 #include "resource/resource_ultrasonic_sensor.h"
 #include "resource/resource_led.h"
+#include "resource/resource_buzzer.h"
 #include "resource/resource_vibration_sensor.h"
 #include "resource/resource_flame_sensor.h"
 #include "resource/resource_rain_sensor.h"
@@ -39,9 +40,6 @@
 #include "resource/resource_gas_detection_sensor.h"
 #include "resource/resource_sound_level_sensor.h"
 #include "resource/resource_camera.h"
-#include "resource/resource_servo_motor.h"
-#include "resource/resource_PCA9685.h"
-#include "resource/resource_motor_driver_L298N.h"
 #include "resource/resource_key_matrix.h"
-
+#include "resource/resource_motor_driver_L298N.h"
 #endif /* __POSITION_FINDER_RESOURCE_H__ */

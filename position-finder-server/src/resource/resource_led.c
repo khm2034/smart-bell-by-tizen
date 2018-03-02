@@ -53,7 +53,7 @@ int resource_write_led(int pin_num, int write_value)
 	ret = peripheral_gpio_write(resource_get_info(pin_num)->sensor_h, write_value);
 	retv_if(ret < 0, -1);
 
-	_I("LED Value : %s", write_value ? "ON":"OFF");
+	//_I("LED Value : %s", write_value ? "ON":"OFF");
 
 	return 0;
 }

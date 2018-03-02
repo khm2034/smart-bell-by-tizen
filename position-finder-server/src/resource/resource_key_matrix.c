@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <peripheral_io.h>
+#include <pthread.h>
 #include <sys/time.h>
 
 #include "log.h"
@@ -147,10 +148,10 @@ int resource_read_key_matrix(char* getch)
 			ret = -1;
 			return ret;
 		}
-		usleep(10);
+		//usleep(10);
 		for(j = 0; j < 4; j++){
-			peripheral_gpio_read(g_km_h.row_pin_h[j], &read);
 			usleep(10);
+			peripheral_gpio_read(g_km_h.row_pin_h[j], &read);
 			//_D("col[%d], row[%d], read[%d]", i, j, read);
 			if(read == 1){
 				//_D("press [%c] key!!", key_matrix_value[j][i]);
@@ -160,14 +161,14 @@ int resource_read_key_matrix(char* getch)
 				}while(read == 1);
 			}
 		}
-		usleep(10);
+		//usleep(10);
 		ret = peripheral_gpio_write(g_km_h.col_pin_h[i], 0);
 		if(ret != PERIPHERAL_ERROR_NONE){
 			_E("failed to set value[1] col[%d] pin", i);
 			ret = -1;
 			return ret;
 		}
-		usleep(10);
+		//usleep(10);
 	}
 
 	return 0;

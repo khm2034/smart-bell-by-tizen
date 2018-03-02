@@ -36,8 +36,8 @@
 #define DEFAULT_MOTOR3_PIN1 6
 #define DEFAULT_MOTOR3_PIN2 12
 
-#define DEFAULT_MOTOR4_PIN1 22
-#define DEFAULT_MOTOR4_PIN2 23
+#define DEFAULT_MOTOR4_PIN1 17
+#define DEFAULT_MOTOR4_PIN2 18
 
 /* Default channel numbers of PCA9685 with enable pins of L298N */
 #define DEFAULT_MOTOR1_EN_CH 1

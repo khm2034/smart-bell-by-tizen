@@ -3,16 +3,29 @@
 #include "resource.h"
 #include "log.h"
 #include "webutil.h"
-char init_pw[MAX_PW_LENGTH];
+char init_pw[MAX_PW_LENGTH + 1];
 int init_pw_idx = 0;
-char input_pw[MAX_PW_LENGTH];
+char input_pw[MAX_PW_LENGTH + 1];
 int input_pw_idx = 0;
 
 char getch=NULL;
+static int lcd_init = 0;
+static int lcd;
 int init_password()
 {
+	if(lcd_init == 0){
+//		lcd = resource_1602A_LCD_init(2, 16, 8, LCD_RS, LCD_E, LCD_D0, LCD_D1, LCD_D2
+//				, LCD_D3, LCD_D4, LCD_D5, LCD_D6, LCD_D7);
+		lcd = resource_1602A_LCD_init(2, 16, 4, LCD_RS, LCD_E, LCD_D4, LCD_D5, LCD_D6
+						, LCD_D7, 0, 0, 0, 0);
+		resource_1602A_LCD_position(lcd, 0, 0);
+		//resource_1602A_LCD_position(lcd, 0, 0);
+		resource_1602A_LCD_puts(lcd, "HELLO");
+		_D("lcd : %d", lcd);
+		lcd_init = 1;
+	}
 	getch=NULL;
-	resource_read_key_matrix(&getch);
+	//resource_read_key_matrix(&getch);
 
 	if(getch != NULL){
 		_D("getch : %c", getch);
@@ -28,8 +41,10 @@ int init_password()
 			break;
 		case 'D':
 			_D("init_pw delete");
-			if(init_pw_idx != 0)
+			if(init_pw_idx != 0){
+				//resource_1602A_LCD_putchar(lcd, ' ');
 				init_pw_idx--;
+			}
 			break;
 		case '#':
 			if(init_pw_idx == 0)
@@ -49,6 +64,8 @@ int init_password()
 			_D("init_pw input");
 			if(init_pw_idx == MAX_PW_LENGTH)
 				break;
+			//resource_1602A_LCD_position(lcd, 0, 0);
+			//resource_1602A_LCD_putchar(lcd, 'A');
 			init_pw[init_pw_idx++] = getch;
 			break;
 		}

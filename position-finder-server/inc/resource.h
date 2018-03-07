@@ -43,4 +43,5 @@
 #include "resource/resource_key_matrix.h"
 #include "resource/resource_motor_driver_L298N.h"
 #include "resource/resource_motor_driver_ULN2003.h"
+#include "resource/resource_1602A_LCD.h"
 #endif /* __POSITION_FINDER_RESOURCE_H__ */

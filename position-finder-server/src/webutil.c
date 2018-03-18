@@ -46,7 +46,9 @@ static size_t _post_response_write_callback(char *ptr, size_t size, size_t nmemb
 	res_size = size*nmemb;
 
 	if (res_size > 0)
+	{
 		_I("POST response : %s", ptr);
+	}
 	/* What should we do here, if response body has negative message? */
 
 	return res_size;
@@ -189,7 +191,7 @@ int web_util_noti_post_image_data(const char *url, const char *device_id,
 	curl_easy_setopt(curl, CURLOPT_DEBUGFUNCTION, __curl_debug);
 
 	// curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, REQ_CON_TIMEOUT);
-	// curl_easy_setopt(curl, CURLOPT_TIMEOUT, REQ_TIMEOUT);
+	// curl_easy_setopt(curl, CURLOPT_TIMEOUT, REQ_TIMEOUT
 
 	response = curl_easy_perform(curl);
 
@@ -203,6 +205,51 @@ int web_util_noti_post_image_data(const char *url, const char *device_id,
 	curl_formfree(formpost);
 	g_free(post_url);
 	g_free(filename);
+
+	return ret;
+}
+
+int custom_web_util_noti_post(const char *resource, const char *json_data, size_t post_callback)
+{
+	int ret = 0;
+	CURL *curl = NULL;
+	CURLcode response = CURLE_OK;
+	struct curl_slist *headers = NULL;
+
+	retv_if(resource == NULL, -1);
+	retv_if(json_data == NULL, -1);
+
+	_I("server : %s", resource);
+	_I("json_data : %s", json_data);
+
+	curl = curl_easy_init();
+
+	if (!curl) {
+		_E("fail to init curl");
+		return -1;
+	}
+
+	headers = curl_slist_append(headers, "Accept: application/json");
+	headers = curl_slist_append(headers, "Content-Type: application/json");
+	curl_easy_setopt(curl, CURLOPT_URL, resource);
+	curl_easy_setopt(curl, CURLOPT_POST, 1L);
+	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+	curl_easy_setopt(curl, CURLOPT_POSTFIELDS, json_data);
+	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, post_callback);
+	curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, REQ_CON_TIMEOUT);
+	curl_easy_setopt(curl, CURLOPT_TIMEOUT, REQ_TIMEOUT);
+
+	response = curl_easy_perform(curl);
+
+	if (response != CURLE_OK) {
+		_E("curl_easy_perform() failed: %s",
+			curl_easy_strerror(response));
+		/* What should we do here, if response is kind of errors? */
+		ret = -1;
+	}
+
+	curl_slist_free_all(headers);
+	curl_easy_cleanup(curl);
 
 	return ret;
 }
@@ -229,7 +276,6 @@ int web_util_noti_post(const char *resource, const char *json_data)
 
 	headers = curl_slist_append(headers, "Accept: application/json");
 	headers = curl_slist_append(headers, "Content-Type: application/json");
-
 	curl_easy_setopt(curl, CURLOPT_URL, resource);
 	curl_easy_setopt(curl, CURLOPT_POST, 1L);
 	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);

@@ -31,8 +31,6 @@
 #define	LCD_CURSOR_CTRL		0x02
 #define	LCD_DISPLAY_CTRL	0x04
 
-// Bits in the function register
-
 #define	LCD_FUNC_F	0x04
 #define	LCD_FUNC_N	0x08
 #define	LCD_FUNC_DL	0x10
@@ -50,15 +48,10 @@ typedef struct __lcd_data{
 } lcd_data;
 
 static lcd_data *lcds [MAX_LCDS] ;
-
 static int lcd_control ;
-
-// Row offsets
-
 static const int row_off [4] = { 0x00, 0x40, 0x14, 0x54 } ;
 
-
-void resource_1602_LCD_close(){
+void resource_1602A_LCD_close(){
 	int i, j;
 	for(i = 0; i< MAX_LCDS; i++){
 		if(lcds[i]->rs_pin_h){
@@ -77,6 +70,8 @@ void resource_1602_LCD_close(){
 				lcds[i]->data_pins_h[j] = NULL;
 			}
 		}
+		free(lcds[i]);
+		lcds[i] = NULL;
 	}
 }
 
@@ -105,10 +100,8 @@ static int _resource_1602A_LCD_send_data_cmd (const lcd_data *lcd, unsigned char
 	int ret = 0;
 	int tmp;
 	peripheral_gpio_read(lcd->rs_pin_h, &tmp);
-	_D("rs : %d", tmp);
 	if (lcd->bits == 4){
 		d4 = (myData >> 4) & 0x0F;
-		_D("D4 : %d", d4);
 
 		for (i = 0 ; i < 4 ; ++i){
 			ret = peripheral_gpio_write(lcd->data_pins_h[i], (d4 & 1));
@@ -122,7 +115,6 @@ static int _resource_1602A_LCD_send_data_cmd (const lcd_data *lcd, unsigned char
 		_resource_1602A_LCD_strobe(lcd) ;
 
 		d4 = myData & 0x0F ;
-		_D("D4 : %d", d4);
 		for (i = 0 ; i < 4 ; ++i){
 			ret = peripheral_gpio_write(lcd->data_pins_h[i], (d4 & 1));
 			if(ret != PERIPHERAL_ERROR_NONE){
@@ -150,7 +142,6 @@ static int _resource_1602A_LCD_send_data_cmd (const lcd_data *lcd, unsigned char
 
 static int _resource_1602A_LCD_put_command (const lcd_data *lcd, unsigned char command){
 	int ret = 0;
-	_D("command : %d", command);
 	ret = peripheral_gpio_write(lcd->rs_pin_h, 0);
 	if(ret != PERIPHERAL_ERROR_NONE){
 		_E("failed to set value[0] rs pin");
@@ -187,7 +178,7 @@ static int _resource_1602A_LCD_put_4_command (const lcd_data *lcd, unsigned char
 	return ret;
 }
 
-void resource_1602A_LCD_home (const int fd){
+void __resource_1602A_LCD_home (const int fd){
 	lcd_data *lcd = lcds [fd] ;
 
 	_resource_1602A_LCD_put_command(lcd, LCD_HOME) ;
@@ -195,7 +186,7 @@ void resource_1602A_LCD_home (const int fd){
 	delay (5) ;
 }
 
-void resource_1602A_LCD_clear (const int fd){
+void __resource_1602A_LCD_clear (const int fd){
 	lcd_data *lcd = lcds [fd] ;
 
 	_resource_1602A_LCD_put_command(lcd, LCD_CLEAR) ;
@@ -204,7 +195,7 @@ void resource_1602A_LCD_clear (const int fd){
 	delay (5) ;
 }
 
-void resource_1602A_LCD_display (const int fd, int state){
+void __resource_1602A_LCD_display (const int fd, int state){
 	lcd_data *lcd = lcds[fd] ;
 
 	if (state)
@@ -215,7 +206,7 @@ void resource_1602A_LCD_display (const int fd, int state){
 	_resource_1602A_LCD_put_command(lcd, LCD_CTRL | lcd_control) ;
 }
 
-void resource_1602A_LCD_cursor (const int fd, int state){
+void __resource_1602A_LCD_cursor (const int fd, int state){
 	lcd_data *lcd = lcds [fd] ;
 
 	if (state)
@@ -226,7 +217,7 @@ void resource_1602A_LCD_cursor (const int fd, int state){
 	_resource_1602A_LCD_put_command(lcd, LCD_CTRL | lcd_control) ;
 }
 
-void resource_1602A_LCD_cursor_blink (const int fd, int state){
+void __resource_1602A_LCD_cursor_blink (const int fd, int state){
 	lcd_data *lcd = lcds [fd] ;
 
 	if (state)
@@ -237,7 +228,7 @@ void resource_1602A_LCD_cursor_blink (const int fd, int state){
 	_resource_1602A_LCD_put_command(lcd, LCD_CTRL | lcd_control) ;
 }
 
-void resource_1602A_LCD_send_command (const int fd, unsigned char command){
+void __resource_1602A_LCD_send_command (const int fd, unsigned char command){
 	lcd_data *lcd = lcds [fd] ;
 	_resource_1602A_LCD_put_command(lcd, command) ;
 }
@@ -257,13 +248,6 @@ void resource_1602A_LCD_position (const int fd, int x, int y)
 	lcd->cy = y ;
 }
 
-
-/*
- * lcdCharDef:
- *	Defines a new character in the CGRAM
- *********************************************************************************
- */
-
 int resource_1602A_LCD_char_def(const int fd, int index, unsigned char data [8]){
 	lcd_data *lcd = lcds [fd] ;
 	int i;
@@ -281,14 +265,6 @@ int resource_1602A_LCD_char_def(const int fd, int index, unsigned char data [8])
 	return 0;
 }
 
-
-/*
- * lcdPutchar:
- *	Send a data byte to be displayed on the display. We implement a very
- *	simple terminal here - with line wrapping, but no scrolling. Yet.
- *********************************************************************************
- */
-
 int resource_1602A_LCD_putchar (const int fd, unsigned char data){
 	lcd_data *lcd = lcds [fd] ;
 	int ret = 0;
@@ -300,36 +276,20 @@ int resource_1602A_LCD_putchar (const int fd, unsigned char data){
 		return ret;
 	}
 	ret = _resource_1602A_LCD_send_data_cmd(lcd, data) ;
-	_D("ret : %d", ret);
-	//_D("lcd->cx : %d, lcd->cols : %d", ++(lcd->cx), lcd->cols);
 
 	if (++lcd->cx == lcd->cols){
 		lcd->cx = 0 ;
 		if (++lcd->cy == lcd->rows)
 			lcd->cy = 0 ;
-		//_D("lcd->cx : %d, lcd->cols : %d", lcd->cx, lcd->cols);
 		_resource_1602A_LCD_put_command(lcd, lcd->cx + (LCD_DGRAM | row_off [lcd->cy])) ;
 	}
+	return ret;
 }
-
-
-/*
- * lcdPuts:
- *	Send a string to be displayed on the display
- *********************************************************************************
- */
 
 void resource_1602A_LCD_puts (const int fd, const char *string){
 	while (*string)
 		resource_1602A_LCD_putchar(fd, *string++) ;
 }
-
-
-/*
- * lcdPrintf:
- *	Printf to an LCD display
- *********************************************************************************
- */
 
 void resource_1602A_LCD_printf (const int fd, const char *message, ...)
 {
@@ -342,14 +302,6 @@ void resource_1602A_LCD_printf (const int fd, const char *message, ...)
 
 	resource_1602A_LCD_puts(fd, buffer) ;
 }
-
-
-/*
- * lcdInit:
- *	Take a lot of parameters and initialise the LCD, and return a handle to
- *	that LCD, or -1 if any error.
- *********************************************************************************
- */
 
 int resource_1602A_LCD_init (const int rows, const int cols, const int bits,
 	const int rs, const int strb,
@@ -370,8 +322,6 @@ int resource_1602A_LCD_init (const int rows, const int cols, const int bits,
 		  lcds [i] = NULL ;
 	}
 
-	// Simple sanity checks
-
 	if (! ((bits == 4) || (bits == 8)))
 		return -1 ;
 
@@ -380,8 +330,6 @@ int resource_1602A_LCD_init (const int rows, const int cols, const int bits,
 
 	if ((cols < 0) || (cols > 20))
 		return -1 ;
-
-	// Create a new LCD:
 
 	for (i = 0 ; i < MAX_LCDS ; ++i){
 		if (lcds [i] == NULL){
@@ -399,7 +347,7 @@ int resource_1602A_LCD_init (const int rows, const int cols, const int bits,
 
 	lcd->rs_pin   = rs ;
 	lcd->strb_pin = strb ;
-	lcd->bits    = 8 ;		// For now - we'll set it properly later.
+	lcd->bits    = 8 ;
 	lcd->rows    = rows ;
 	lcd->cols    = cols ;
 	lcd->cx      = 0 ;
@@ -470,12 +418,10 @@ int resource_1602A_LCD_init (const int rows, const int cols, const int bits,
 		_resource_1602A_LCD_put_command(lcd, func) ; delay (35) ;
 	}
 
-	// Rest of the initialisation sequence
-
-	resource_1602A_LCD_display(lcd_fd, TRUE) ;
-	resource_1602A_LCD_cursor(lcd_fd, FALSE) ;
-	resource_1602A_LCD_cursor_blink(lcd_fd, FALSE) ;
-	resource_1602A_LCD_clear(lcd_fd) ;
+	__resource_1602A_LCD_display(lcd_fd, TRUE) ;
+	__resource_1602A_LCD_cursor(lcd_fd, FALSE) ;
+	__resource_1602A_LCD_cursor_blink(lcd_fd, FALSE) ;
+	__resource_1602A_LCD_clear(lcd_fd) ;
 
 	_resource_1602A_LCD_put_command(lcd, LCD_ENTRY   | LCD_ENTRY_ID) ;
 	_resource_1602A_LCD_put_command(lcd, LCD_CDSHIFT | LCD_CDSHIFT_RL) ;

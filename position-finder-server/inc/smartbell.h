@@ -4,5 +4,8 @@
 
 #include "smartbell/smartbell_password.h"
 #include "smartbell/smartbell_motor.h"
+#include "smartbell/smartbell_setting.h"
+#include "smartbell/smartbell_timer.h"
+#include "smartbell/smartbell_util.h"
 
 #endif

@@ -6,5 +6,5 @@
 
 int init_password();
 int input_password();
-
+void set_password(char* s);
 #endif

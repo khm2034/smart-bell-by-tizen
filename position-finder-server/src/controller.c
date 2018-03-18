@@ -24,7 +24,6 @@
 #include <Ecore.h>
 #include <tizen.h>
 #include <service_app.h>
-
 #include "log.h"
 #include "resource.h"
 #include "connectivity.h"
@@ -47,7 +46,8 @@ typedef struct app_data_s {
 } app_data;
 
 typedef enum {
-	INIT_PW,
+	SETTING,
+	RUN_TIMER,
 	INPUT_PW,
 	RUN_MOTOR,
 	STOP_MOTOR
@@ -109,24 +109,37 @@ static void _ultrasonic_sensor_read_cb(double value, void *data)
 
 	return;
 }
-static smartbell_state_e smartbell_state = INIT_PW;
+static smartbell_state_e smartbell_state = SETTING;
 static int speed = 3500;
 static int cnt = 1;
 static Eina_Bool control_sensors_cb(void *data)
 {
 	app_data *ad = data;
 	int ret = -1;
-
 	switch(smartbell_state){
-	case INIT_PW:
-		if(init_password()==1){
+	case SETTING:
+		if(input_order_num()==1){
+			smartbell_state = RUN_TIMER;
+			print_lcd("RUN TIMER");
+		}
+		break;
+	case RUN_TIMER:
+		ret = run_timer();
+		if(ret == 1){
+			smartbell_state = RUN_MOTOR;
+			timer_time = 1.5f;
+			print_lcd("RUN MOTOR");
+		}
+		else if(ret == 2){
 			smartbell_state = INPUT_PW;
+			print_lcd("INPUT PW");
 		}
 		break;
 	case INPUT_PW:
 		if(input_password() == 1){
 			smartbell_state = RUN_MOTOR;
 			timer_time = 1.5f;
+			print_lcd("RUN MOTOR");
 		}
 		break;
 	case RUN_MOTOR:
@@ -150,7 +163,6 @@ static Eina_Bool control_sensors_cb(void *data)
 static bool service_app_create(void *data)
 {
 	app_data *ad = data;
-	app_data *ad2 = data;
 	int ret = -1;
 	const char *path = NULL;
 
@@ -178,6 +190,7 @@ static bool service_app_create(void *data)
 	 * Creates a timer to call the given function in the given period of time.
 	 * In the control_sensors_cb(), each sensor reads the measured value or writes a specific value to the sensor.
 	 */
+	print_lcd("INPUT ORDER NUM");
 	ad->getter_timer = ecore_timer_add(timer_time, control_sensors_cb, ad);
 	if (!ad->getter_timer) {
 		_E("Failed to add infrared motion getter timer");

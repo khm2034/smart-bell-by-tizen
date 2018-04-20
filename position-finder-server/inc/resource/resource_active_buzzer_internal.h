@@ -19,9 +19,9 @@
  * limitations under the License.
  */
 
-#ifndef __POSITION_FINDER_RESOURCE_BUZZER_H__
-#define __POSITION_FINDER_RESOURCE_BUZZER_H__
+#ifndef __POSITION_FINDER_RESOURCE_BUZZER_INTERNAL_H__
+#define __POSITION_FINDER_RESOURCE_BUZZER_INTERNAL_H__
 
-extern int resource_write_buzzer(int pin_num, int write_value);
+extern void resource_close_active_buzzer(int pin_num);
 
-#endif /* __POSITION_FINDER_RESOURCE_LED_H__ */
+#endif /* __POSITION_FINDER_RESOURCE_LED_INTERNAL_H__ */

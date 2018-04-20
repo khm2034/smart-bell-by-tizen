@@ -6,36 +6,11 @@
 #include "resource/resource_1602A_LCD.h"
 #include "smartbell/smartbell_util.h"
 
-#define TRUE (1==1)
-#define FALSE (1==2)
-
-// HD44780U Commands
-
-#define	LCD_CLEAR	0x01
-#define	LCD_HOME	0x02
-#define	LCD_ENTRY	0x04
-#define	LCD_CTRL	0x08
-#define	LCD_CDSHIFT	0x10
-#define	LCD_FUNC	0x20
-#define	LCD_CGRAM	0x40
-#define	LCD_DGRAM	0x80
-
-// Bits in the entry register
-
-#define	LCD_ENTRY_SH		0x01
-#define	LCD_ENTRY_ID		0x02
-
-// Bits in the control register
-
-#define	LCD_BLINK_CTRL		0x01
-#define	LCD_CURSOR_CTRL		0x02
-#define	LCD_DISPLAY_CTRL	0x04
-
-#define	LCD_FUNC_F	0x04
-#define	LCD_FUNC_N	0x08
-#define	LCD_FUNC_DL	0x10
-
-#define	LCD_CDSHIFT_RL	0x04
+typedef enum {
+	LCD_STATE_NONE,
+	LCD_STATE_CONFIGURED,
+	LCD_STATE_RUNNING,
+} lcd_state_e;
 
 typedef struct __lcd_data{
 	int bits, rows, cols ;
@@ -44,47 +19,54 @@ typedef struct __lcd_data{
 	peripheral_gpio_h rs_pin_h;
 	peripheral_gpio_h strb_pin_h;
 	peripheral_gpio_h data_pins_h[8];
+	lcd_state_e lcd_state;
 	int cx, cy ;
 } lcd_data;
 
-static lcd_data *lcds [MAX_LCDS] ;
+static lcd_data lcds [LCD_MAX] = {
+		{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, LCD_STATE_NONE, 0, 0},
+};
 static int lcd_control ;
 static const int row_off [4] = { 0x00, 0x40, 0x14, 0x54 } ;
 
-void resource_1602A_LCD_close(){
+void resource_1602A_LCD_close(lcd_id_e id){
+	int i;
+	if(lcds[id].rs_pin_h){
+		peripheral_gpio_close(lcds[id].rs_pin_h);
+		lcds[id].rs_pin_h = NULL;
+	}
+
+	if(lcds[id].strb_pin_h){
+		peripheral_gpio_close(lcds[id].strb_pin_h);
+		lcds[id].strb_pin_h = NULL;
+	}
+
+	for (i = 0 ; i < lcds[id].bits ; ++i){
+		if(lcds[id].data_pins_h[i]){
+			peripheral_gpio_close(lcds[id].data_pins_h[i]);
+			lcds[id].data_pins_h[i] = NULL;
+		}
+	}
+	lcds[id].lcd_state = LCD_STATE_NONE;
+}
+void resource_1602A_LCD_close_all(){
 	int i, j;
-	for(i = 0; i< MAX_LCDS; i++){
-		if(lcds[i]->rs_pin_h){
-			peripheral_gpio_close(lcds[i]->rs_pin_h);
-			lcds[i]->rs_pin_h = NULL;
-		}
-
-		if(lcds[i]->strb_pin_h){
-			peripheral_gpio_close(lcds[i]->strb_pin_h);
-			lcds[i]->strb_pin_h = NULL;
-		}
-
-		for (j = 0 ; j < lcds[i]->bits ; ++j){
-			if(lcds[i]->data_pins_h[j]){
-				peripheral_gpio_close(lcds[i]->data_pins_h[j]);
-				lcds[i]->data_pins_h[j] = NULL;
-			}
-		}
-		free(lcds[i]);
-		lcds[i] = NULL;
+	for(i = 0; i< LCD_MAX; i++){
+		resource_1602A_LCD_close(i);
 	}
 }
 
-static int _resource_1602A_LCD_strobe (const lcd_data *lcd){
+static int __resource_1602A_LCD_strobe (const lcd_id_e id){
 	int ret = 0;
-	ret = peripheral_gpio_write(lcd->strb_pin_h, 1);
+	ret = peripheral_gpio_write(lcds[id].strb_pin_h, 1);
 	if(ret != PERIPHERAL_ERROR_NONE){
 		_E("failed to set value[1] strb pin");
 		ret = -1;
 		return ret;
 	}
 	delay_microseconds (50) ;
-	ret = peripheral_gpio_write(lcd->strb_pin_h, 0);
+	ret = peripheral_gpio_write(lcds[id].strb_pin_h, 0);
 	if(ret != PERIPHERAL_ERROR_NONE){
 		_E("failed to set value[0] strb pin");
 		ret = -1;
@@ -94,17 +76,15 @@ static int _resource_1602A_LCD_strobe (const lcd_data *lcd){
 	return ret;
 }
 
-static int _resource_1602A_LCD_send_data_cmd (const lcd_data *lcd, unsigned char data){
-	register unsigned char myData = data;
+static int __resource_1602A_LCD_send_data_cmd (const lcd_id_e id, unsigned char data){
+	register unsigned char my_data = data;
 	unsigned char i, d4;
 	int ret = 0;
-	int tmp;
-	peripheral_gpio_read(lcd->rs_pin_h, &tmp);
-	if (lcd->bits == 4){
-		d4 = (myData >> 4) & 0x0F;
+	if (lcds[id].bits == 4){
+		d4 = (my_data >> 4) & 0x0F;
 
 		for (i = 0 ; i < 4 ; ++i){
-			ret = peripheral_gpio_write(lcd->data_pins_h[i], (d4 & 1));
+			ret = peripheral_gpio_write(lcds[id].data_pins_h[i], (d4 & 1));
 			if(ret != PERIPHERAL_ERROR_NONE){
 				_E("failed to set value[0] col[%d] pin", i);
 				ret = -1;
@@ -112,11 +92,11 @@ static int _resource_1602A_LCD_send_data_cmd (const lcd_data *lcd, unsigned char
 			}
 			d4 >>= 1 ;
 		}
-		_resource_1602A_LCD_strobe(lcd) ;
+		__resource_1602A_LCD_strobe(id) ;
 
-		d4 = myData & 0x0F ;
+		d4 = my_data & 0x0F ;
 		for (i = 0 ; i < 4 ; ++i){
-			ret = peripheral_gpio_write(lcd->data_pins_h[i], (d4 & 1));
+			ret = peripheral_gpio_write(lcds[id].data_pins_h[i], (d4 & 1));
 			if(ret != PERIPHERAL_ERROR_NONE){
 				_E("failed to set value[0] col[%d] pin", i);
 				ret = -1;
@@ -127,171 +107,323 @@ static int _resource_1602A_LCD_send_data_cmd (const lcd_data *lcd, unsigned char
 	}
 	else{
 		for (i = 0 ; i < 8 ; ++i){
-			ret = peripheral_gpio_write(lcd->data_pins_h[i], (myData & 1));
+			ret = peripheral_gpio_write(lcds[id].data_pins_h[i], (my_data & 1));
 			if(ret != PERIPHERAL_ERROR_NONE){
 				_E("failed to set value[0] col[%d] pin", i);
 				ret = -1;
 				return ret;
 			}
-			myData >>= 1 ;
+			my_data >>= 1 ;
 		}
 	}
-	ret = _resource_1602A_LCD_strobe(lcd) ;
+	ret = __resource_1602A_LCD_strobe(id) ;
 	return ret;
 }
 
-static int _resource_1602A_LCD_put_command (const lcd_data *lcd, unsigned char command){
+static int __resource_1602A_LCD_put_command (const lcd_id_e id, unsigned char command){
 	int ret = 0;
-	ret = peripheral_gpio_write(lcd->rs_pin_h, 0);
+	ret = peripheral_gpio_write(lcds[id].rs_pin_h, 0);
 	if(ret != PERIPHERAL_ERROR_NONE){
 		_E("failed to set value[0] rs pin");
 		ret = -1;
 		return ret;
 	}
-	ret = _resource_1602A_LCD_send_data_cmd(lcd, command);
+	ret = __resource_1602A_LCD_send_data_cmd(id, command);
 	delay (2);
 	return ret;
 }
 
-static int _resource_1602A_LCD_put_4_command (const lcd_data *lcd, unsigned char command){
-	register unsigned char myCommand = command ;
+static int __resource_1602A_LCD_put_4_command (const lcd_id_e id, unsigned char command){
+	register unsigned char my_command = command ;
 	register unsigned char i ;
 	int ret = 0;
 
-	ret = peripheral_gpio_write(lcd->rs_pin_h, 0);
+	ret = peripheral_gpio_write(lcds[id].rs_pin_h, 0);
 	if(ret != PERIPHERAL_ERROR_NONE){
-		_E("failed to set value[0] col[%d] pin", i);
+		_E("failed to set value[0] rs[%d] pin", lcds[id].rs_pin);
 		ret = -1;
 		return ret;
 	}
 
 	for (i = 0 ; i < 4 ; ++i){
-		ret = peripheral_gpio_write(lcd->data_pins_h[i], (myCommand & 1));
+		ret = peripheral_gpio_write(lcds[id].data_pins_h[i], (my_command & 1));
 		if(ret != PERIPHERAL_ERROR_NONE){
-			_E("failed to set value[0] col[%d] pin", i);
+			_E("failed to set value[%d] data[%d] pin", (my_command & 1), lcds[id].data_pins[i]);
 			ret = -1;
 			return ret;
 		}
-		myCommand >>= 1 ;
+		my_command >>= 1 ;
 	}
-	ret = _resource_1602A_LCD_strobe(lcd);
+	ret = __resource_1602A_LCD_strobe(id);
 	return ret;
 }
 
-void __resource_1602A_LCD_home (const int fd){
-	lcd_data *lcd = lcds [fd] ;
-
-	_resource_1602A_LCD_put_command(lcd, LCD_HOME) ;
-	lcd->cx = lcd->cy = 0 ;
+void __resource_1602A_LCD_home (const lcd_id_e id){
+	__resource_1602A_LCD_put_command(id, LCD_HOME) ;
+	lcds[id].cx = lcds[id].cy = 0 ;
 	delay (5) ;
 }
 
-void __resource_1602A_LCD_clear (const int fd){
-	lcd_data *lcd = lcds [fd] ;
-
-	_resource_1602A_LCD_put_command(lcd, LCD_CLEAR) ;
-	_resource_1602A_LCD_put_command(lcd, LCD_HOME) ;
-	lcd->cx = lcd->cy = 0 ;
+void __resource_1602A_LCD_clear (const lcd_id_e id){
+	__resource_1602A_LCD_put_command(id, LCD_CLEAR) ;
+	__resource_1602A_LCD_put_command(id, LCD_HOME) ;
+	lcds[id].cx = lcds[id].cy = 0 ;
 	delay (5) ;
 }
 
-void __resource_1602A_LCD_display (const int fd, int state){
-	lcd_data *lcd = lcds[fd] ;
-
+void __resource_1602A_LCD_display (const lcd_id_e id, int state){
 	if (state)
 		lcd_control |=  LCD_DISPLAY_CTRL ;
 	else
 		lcd_control &= ~LCD_DISPLAY_CTRL ;
 
-	_resource_1602A_LCD_put_command(lcd, LCD_CTRL | lcd_control) ;
+	__resource_1602A_LCD_put_command(id, LCD_CTRL | lcd_control) ;
 }
 
-void __resource_1602A_LCD_cursor (const int fd, int state){
-	lcd_data *lcd = lcds [fd] ;
-
+void __resource_1602A_LCD_cursor (const lcd_id_e id, int state){
 	if (state)
 		lcd_control |=  LCD_CURSOR_CTRL ;
 	else
 		lcd_control &= ~LCD_CURSOR_CTRL ;
 
-	_resource_1602A_LCD_put_command(lcd, LCD_CTRL | lcd_control) ;
+	__resource_1602A_LCD_put_command(id, LCD_CTRL | lcd_control) ;
 }
 
-void __resource_1602A_LCD_cursor_blink (const int fd, int state){
-	lcd_data *lcd = lcds [fd] ;
-
+void __resource_1602A_LCD_cursor_blink (const lcd_id_e id, int state){
 	if (state)
 		lcd_control |=  LCD_BLINK_CTRL ;
 	else
 		lcd_control &= ~LCD_BLINK_CTRL ;
 
-	_resource_1602A_LCD_put_command(lcd, LCD_CTRL | lcd_control) ;
+	__resource_1602A_LCD_put_command(id, LCD_CTRL | lcd_control) ;
 }
 
-void __resource_1602A_LCD_send_command (const int fd, unsigned char command){
-	lcd_data *lcd = lcds [fd] ;
-	_resource_1602A_LCD_put_command(lcd, command) ;
+void __resource_1602A_LCD_send_command (const lcd_id_e id, unsigned char command){
+	__resource_1602A_LCD_put_command(id, command) ;
 }
 
-void resource_1602A_LCD_position (const int fd, int x, int y)
+int __resource_set_defalut_1602A_LCD_configuration_by_id(lcd_id_e id)
 {
-	lcd_data *lcd = lcds [fd] ;
-
-	if ((x > lcd->cols) || (x < 0))
-		return ;
-	if ((y > lcd->rows) || (y < 0))
-		return ;
-
-	_resource_1602A_LCD_put_command(lcd, x + (LCD_DGRAM | row_off[y])) ;
-
-	lcd->cx = x ;
-	lcd->cy = y ;
+	switch(id){
+	case LCD_ID_1:
+		lcds[id].rs_pin	= DEFAULT_RS_PIN;
+		lcds[id].strb_pin = DEFAULT_STRB_PIN;
+		lcds[id].bits = DEFAULT_BITS;
+		lcds[id].rows = DEFAULT_ROW;
+		lcds[id].cols = DEFAULT_COL;
+		lcds[id].cx = 0;
+		lcds[id].cy = 0;
+		lcds[id].data_pins[0] = DEFAULT_D0_PIN;
+		lcds[id].data_pins[1] = DEFAULT_D1_PIN;
+		lcds[id].data_pins[2] = DEFAULT_D2_PIN;
+		lcds[id].data_pins[3] = DEFAULT_D3_PIN;
+		lcds[id].data_pins[4] = DEFAULT_D4_PIN;
+		lcds[id].data_pins[5] = DEFAULT_D5_PIN;
+		lcds[id].data_pins[6] = DEFAULT_D6_PIN;
+		lcds[id].data_pins[7] = DEFAULT_D7_PIN;
+		break;
+	default:
+		_E("Unkwon ID[%d]", id);
+			return -1;
+		break;
+	}
+	lcds[id].lcd_state = LCD_STATE_CONFIGURED;
+	return 0;
 }
 
-int resource_1602A_LCD_char_def(const int fd, int index, unsigned char data [8]){
-	lcd_data *lcd = lcds [fd] ;
+int resource_set_1602A_LCD_configuration(lcd_id_e id, int rows, int cols, int bits,
+		int rs, int strb, int d0, int d1, int d2, int d3, int d4, int d5, int d6, int d7 ){
+
+	if(lcds[id].lcd_state > LCD_STATE_CONFIGURED){
+		_E("cannot set configuration motor[%d] in this state[%d]",
+			id, lcds[id].lcd_state);
+		return -1;
+	}
+
+	lcds[id].rs_pin	= rs;
+	lcds[id].strb_pin = strb;
+	lcds[id].bits = bits;
+	lcds[id].rows = rows;
+	lcds[id].cols = cols;
+	lcds[id].cx = 0;
+	lcds[id].cy = 0;
+	lcds[id].data_pins[0] = d0;
+	lcds[id].data_pins[1] = d1;
+	lcds[id].data_pins[2] = d2;
+	lcds[id].data_pins[3] = d3;
+	lcds[id].data_pins[4] = d4;
+	lcds[id].data_pins[5] = d5;
+	lcds[id].data_pins[6] = d6;
+	lcds[id].data_pins[7] = d7;
+	lcds[id].lcd_state = LCD_STATE_CONFIGURED;
+	return 0;
+}
+
+int __resource_1602A_LCD_init_by_id(lcd_id_e id){
+	int ret = 0;
+	unsigned char func;
+	int i ;
+
+	if(lcds[id].lcd_state == LCD_STATE_NONE)
+		__resource_set_defalut_1602A_LCD_configuration_by_id(id);
+
+	ret = peripheral_gpio_open(lcds[id].rs_pin, &lcds[id].rs_pin_h);
+	if (ret == PERIPHERAL_ERROR_NONE){
+		peripheral_gpio_set_direction(lcds[id].rs_pin_h,
+			PERIPHERAL_GPIO_DIRECTION_OUT_INITIALLY_LOW);
+	}
+	else {
+		_E("failed to open gpio rs pin[%u]", lcds[id].rs_pin);
+		goto ERROR;
+	}
+
+	ret = peripheral_gpio_open(lcds[id].strb_pin, &lcds[id].strb_pin_h);
+	if (ret == PERIPHERAL_ERROR_NONE){
+		peripheral_gpio_set_direction(lcds[id].strb_pin_h,
+			PERIPHERAL_GPIO_DIRECTION_OUT_INITIALLY_LOW);
+	}
+	else {
+		_E("failed to open gpio strb pin[%u]", lcds[id].strb_pin_h);
+		goto ERROR;
+	}
+
+	for (i = 0 ; i < lcds[id].bits ; ++i){
+		ret = peripheral_gpio_open(lcds[id].data_pins[i], &lcds[id].data_pins_h[i]);
+		if (ret == PERIPHERAL_ERROR_NONE){
+			peripheral_gpio_set_direction(lcds[id].data_pins_h[i],
+				PERIPHERAL_GPIO_DIRECTION_OUT_INITIALLY_LOW);
+		}
+		else {
+			_E("failed to open gpio data[%d] pin[%u]", i, lcds[id].data_pins[i]);
+			goto ERROR;
+		}
+	}
+	delay (35) ; // mS
+
+	if (lcds[id].bits == 4){
+		func = LCD_FUNC | LCD_FUNC_DL ;			// Set 8-bit mode 3 times
+		__resource_1602A_LCD_put_4_command(id, func >> 4) ; delay (35) ;
+		__resource_1602A_LCD_put_4_command(id, func >> 4) ; delay (35) ;
+		__resource_1602A_LCD_put_4_command(id, func >> 4) ; delay (35) ;
+		func = LCD_FUNC ;					// 4th set: 4-bit mode
+		__resource_1602A_LCD_put_4_command(id, func >> 4) ; delay (35) ;
+		lcds[id].bits = 4 ;
+	}
+
+	else{
+		func = LCD_FUNC | LCD_FUNC_DL ;
+		__resource_1602A_LCD_put_command(id, func) ; delay (35) ;
+		__resource_1602A_LCD_put_command(id, func) ; delay (35) ;
+		__resource_1602A_LCD_put_command(id, func) ; delay (35) ;
+	}
+
+	if (lcds[id].rows > 1){
+		func |= LCD_FUNC_N ;
+		__resource_1602A_LCD_put_command(id, func) ; delay (35) ;
+	}
+
+	__resource_1602A_LCD_display(id, TRUE) ;
+	__resource_1602A_LCD_cursor(id, FALSE) ;
+	__resource_1602A_LCD_cursor_blink(id, FALSE) ;
+	__resource_1602A_LCD_clear(id) ;
+
+	__resource_1602A_LCD_put_command(id, LCD_ENTRY   | LCD_ENTRY_ID) ;
+	__resource_1602A_LCD_put_command(id, LCD_CDSHIFT | LCD_CDSHIFT_RL) ;
+	lcds[id].lcd_state = LCD_STATE_RUNNING;
+	return 0;
+
+ERROR:
+	if(lcds[id].rs_pin_h){
+		peripheral_gpio_close(lcds[id].rs_pin_h);
+		lcds[id].rs_pin_h = NULL;
+	}
+
+	if(lcds[id].strb_pin_h){
+		peripheral_gpio_close(lcds[id].strb_pin_h);
+		lcds[id].strb_pin_h = NULL;
+	}
+
+	for (i = 0 ; i < lcds[id].bits ; ++i){
+		if(lcds[id].data_pins_h[i]){
+			peripheral_gpio_close(lcds[id].data_pins_h[i]);
+			lcds[id].data_pins_h[i] = NULL;
+		}
+	}
+	lcds[id].lcd_state = LCD_STATE_NONE;
+	return -1;
+}
+
+int resource_1602A_LCD_position (const lcd_id_e id, int x, int y)
+{
+	int ret = 0;
+	if(lcds[id].lcd_state <= LCD_STATE_CONFIGURED){
+		ret = __resource_1602A_LCD_init_by_id(id);
+		if(ret){
+			_E("failed to __init_lcd_by_id()");
+			return -1;
+		}
+	}
+	if ((x > lcds[id].cols) || (x < 0))
+		return -1;
+	if ((y > lcds[id].rows) || (y < 0))
+		return -1;
+
+	__resource_1602A_LCD_put_command(id, x + (LCD_DGRAM | row_off[y])) ;
+
+	lcds[id].cx = x ;
+	lcds[id].cy = y ;
+	return 0;
+}
+
+int resource_1602A_LCD_char_def(const lcd_id_e id, int index, unsigned char data [8]){
 	int i;
 	int ret = 0;
-	_resource_1602A_LCD_put_command(lcd, LCD_CGRAM | ((index & 7) << 3)) ;
+	__resource_1602A_LCD_put_command(id, LCD_CGRAM | ((index & 7) << 3)) ;
 
-	ret = peripheral_gpio_write(lcd->rs_pin_h, 1);
+	ret = peripheral_gpio_write(lcds[id].rs_pin_h, 1);
 	if(ret != PERIPHERAL_ERROR_NONE){
-		_E("failed to set value[0] rs pin", i);
+		_E("failed to set value[1] rs[%d] pin", lcds[id].rs_pin);
 		ret = -1;
 		return ret;
 	}
 	for (i = 0 ; i < 8 ; ++i)
-		_resource_1602A_LCD_send_data_cmd(lcd, data[i]) ;
+		__resource_1602A_LCD_send_data_cmd(id, data[i]) ;
 	return 0;
 }
 
-int resource_1602A_LCD_putchar (const int fd, unsigned char data){
-	lcd_data *lcd = lcds [fd] ;
+int resource_1602A_LCD_putchar (const lcd_id_e id, unsigned char data){
 	int ret = 0;
-	_D("data : %c", data);
-	ret = peripheral_gpio_write(lcd->rs_pin_h, 1);
+	//_D("data : %c", data);
+	if(lcds[id].lcd_state <= LCD_STATE_CONFIGURED){
+		ret = __resource_1602A_LCD_init_by_id(id);
+		if(ret){
+			_E("failed to __init_lcd_by_id()");
+			return -1;
+		}
+	}
+	ret = peripheral_gpio_write(lcds[id].rs_pin_h, 1);
 	if(ret != PERIPHERAL_ERROR_NONE){
-		_E("failed to set value[0] rs pin");
+		_E("failed to set value[1] rs[%d] pin", lcds[id].rs_pin);
 		ret = -1;
 		return ret;
 	}
-	ret = _resource_1602A_LCD_send_data_cmd(lcd, data) ;
+	ret = __resource_1602A_LCD_send_data_cmd(id, data) ;
 
-	if (++lcd->cx == lcd->cols){
-		lcd->cx = 0 ;
-		if (++lcd->cy == lcd->rows)
-			lcd->cy = 0 ;
-		_resource_1602A_LCD_put_command(lcd, lcd->cx + (LCD_DGRAM | row_off [lcd->cy])) ;
+	if (++lcds[id].cx == lcds[id].cols){
+		lcds[id].cx = 0 ;
+		if (++lcds[id].cy == lcds[id].rows)
+			lcds[id].cy = 0 ;
+		__resource_1602A_LCD_put_command(id, lcds[id].cx + (LCD_DGRAM | row_off [lcds[id].cy])) ;
 	}
 	return ret;
 }
 
-void resource_1602A_LCD_puts (const int fd, const char *string){
+void resource_1602A_LCD_puts (const lcd_id_e id, const char *string){
 	while (*string)
-		resource_1602A_LCD_putchar(fd, *string++) ;
+		resource_1602A_LCD_putchar(id, *string++) ;
 }
 
-void resource_1602A_LCD_printf (const int fd, const char *message, ...)
+void resource_1602A_LCD_printf (const lcd_id_e id, const char *message, ...)
 {
 	va_list argp ;
 	char buffer [1024] ;
@@ -300,151 +432,5 @@ void resource_1602A_LCD_printf (const int fd, const char *message, ...)
 	vsnprintf (buffer, 1023, message, argp) ;
 	va_end (argp) ;
 
-	resource_1602A_LCD_puts(fd, buffer) ;
-}
-
-int resource_1602A_LCD_init (const int rows, const int cols, const int bits,
-	const int rs, const int strb,
-	const int d0, const int d1, const int d2, const int d3, const int d4,
-	const int d5, const int d6, const int d7){
-	int ret = 0;
-
-	unsigned char func ;
-	int i ;
-	int lcd_fd = -1 ;
-	lcd_data *lcd ;
-
-	static int init = 0 ;
-
-	if (init == 0){
-		init = 1 ;
-		for (i = 0 ; i < MAX_LCDS ; ++i)
-		  lcds [i] = NULL ;
-	}
-
-	if (! ((bits == 4) || (bits == 8)))
-		return -1 ;
-
-	if ((rows < 0) || (rows > 20))
-		return -1 ;
-
-	if ((cols < 0) || (cols > 20))
-		return -1 ;
-
-	for (i = 0 ; i < MAX_LCDS ; ++i){
-		if (lcds [i] == NULL){
-			lcd_fd = i;
-			break ;
-		}
-	}
-
-	if (lcd_fd == -1)
-		return -1 ;
-
-	lcd = (lcd_data *)malloc (sizeof (lcd_data)) ;
-	if (lcd == NULL)
-		return -1 ;
-
-	lcd->rs_pin   = rs ;
-	lcd->strb_pin = strb ;
-	lcd->bits    = 8 ;
-	lcd->rows    = rows ;
-	lcd->cols    = cols ;
-	lcd->cx      = 0 ;
-	lcd->cy      = 0 ;
-
-	lcd->data_pins[0] = d0 ;
-	lcd->data_pins[1] = d1 ;
-	lcd->data_pins[2] = d2 ;
-	lcd->data_pins[3] = d3 ;
-	lcd->data_pins[4] = d4 ;
-	lcd->data_pins[5] = d5 ;
-	lcd->data_pins[6] = d6 ;
-	lcd->data_pins[7] = d7 ;
-	lcds [lcd_fd] = lcd ;
-
-	ret = peripheral_gpio_open(lcd->rs_pin, &lcd->rs_pin_h);
-	if (ret == PERIPHERAL_ERROR_NONE){
-		peripheral_gpio_set_direction(lcd->rs_pin_h,
-			PERIPHERAL_GPIO_DIRECTION_OUT_INITIALLY_LOW);
-	}
-	else {
-		_E("failed to open gpio rs pin[%u]", lcd->rs_pin);
-		goto ERROR;
-	}
-
-	ret = peripheral_gpio_open(lcd->strb_pin, &lcd->strb_pin_h);
-	if (ret == PERIPHERAL_ERROR_NONE){
-		peripheral_gpio_set_direction(lcd->strb_pin_h,
-			PERIPHERAL_GPIO_DIRECTION_OUT_INITIALLY_LOW);
-	}
-	else {
-		_E("failed to open gpio strb pin[%u]", lcd->strb_pin_h);
-		goto ERROR;
-	}
-
-	for (i = 0 ; i < bits ; ++i){
-		ret = peripheral_gpio_open(lcd->data_pins[i], &lcd->data_pins_h[i]);
-		if (ret == PERIPHERAL_ERROR_NONE){
-			peripheral_gpio_set_direction(lcd->data_pins_h[i],
-				PERIPHERAL_GPIO_DIRECTION_OUT_INITIALLY_LOW);
-		}
-		else {
-			_E("failed to open gpio data[%d] pin[%u]", i, lcd->data_pins[i]);
-			goto ERROR;
-		}
-	}
-	delay (35) ; // mS
-
-	if (bits == 4){
-		func = LCD_FUNC | LCD_FUNC_DL ;			// Set 8-bit mode 3 times
-		_resource_1602A_LCD_put_4_command(lcd, func >> 4) ; delay (35) ;
-		_resource_1602A_LCD_put_4_command(lcd, func >> 4) ; delay (35) ;
-		_resource_1602A_LCD_put_4_command(lcd, func >> 4) ; delay (35) ;
-		func = LCD_FUNC ;					// 4th set: 4-bit mode
-		_resource_1602A_LCD_put_4_command(lcd, func >> 4) ; delay (35) ;
-		lcd->bits = 4 ;
-	}
-
-	else{
-		func = LCD_FUNC | LCD_FUNC_DL ;
-		_resource_1602A_LCD_put_command(lcd, func) ; delay (35) ;
-		_resource_1602A_LCD_put_command(lcd, func) ; delay (35) ;
-		_resource_1602A_LCD_put_command(lcd, func) ; delay (35) ;
-	}
-
-	if (lcd->rows > 1){
-		func |= LCD_FUNC_N ;
-		_resource_1602A_LCD_put_command(lcd, func) ; delay (35) ;
-	}
-
-	__resource_1602A_LCD_display(lcd_fd, TRUE) ;
-	__resource_1602A_LCD_cursor(lcd_fd, FALSE) ;
-	__resource_1602A_LCD_cursor_blink(lcd_fd, FALSE) ;
-	__resource_1602A_LCD_clear(lcd_fd) ;
-
-	_resource_1602A_LCD_put_command(lcd, LCD_ENTRY   | LCD_ENTRY_ID) ;
-	_resource_1602A_LCD_put_command(lcd, LCD_CDSHIFT | LCD_CDSHIFT_RL) ;
-
-	return lcd_fd;
-
-ERROR:
-	if(lcd->rs_pin_h){
-		peripheral_gpio_close(lcd->rs_pin_h);
-		lcd->rs_pin_h = NULL;
-	}
-
-	if(lcd->strb_pin_h){
-		peripheral_gpio_close(lcd->strb_pin_h);
-		lcd->strb_pin_h = NULL;
-	}
-
-	for (i = 0 ; i < bits ; ++i){
-		if(lcd->data_pins_h[i]){
-			peripheral_gpio_close(lcd->data_pins_h[i]);
-			lcd->data_pins_h[i] = NULL;
-		}
-	}
-
-	return -1;
+	resource_1602A_LCD_puts(id, buffer) ;
 }

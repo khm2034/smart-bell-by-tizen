@@ -6,7 +6,7 @@
 #include "log.h"
 #include "resource_internal.h"
 
-void resource_close_buzzer(int pin_num)
+void resource_close_active_buzzer(int pin_num)
 {
 	if (!resource_get_info(pin_num)->opened) return;
 
@@ -15,7 +15,7 @@ void resource_close_buzzer(int pin_num)
 	resource_get_info(pin_num)->opened = 0;
 }
 
-int resource_write_buzzer(int pin_num, int write_value)
+int resource_write_active_buzzer(int pin_num, int write_value)
 {
 	int ret = PERIPHERAL_ERROR_NONE;
 
@@ -27,7 +27,7 @@ int resource_write_buzzer(int pin_num, int write_value)
 		retv_if(ret != 0, -1);
 
 		resource_get_info(pin_num)->opened = 1;
-		resource_get_info(pin_num)->close = resource_close_buzzer;
+		resource_get_info(pin_num)->close = resource_close_active_buzzer;
 	}
 
 	ret = peripheral_gpio_write(resource_get_info(pin_num)->sensor_h, write_value);

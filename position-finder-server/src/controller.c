@@ -35,10 +35,19 @@
 #define CONNECTIVITY_KEY "opened"
 #define SENSORING_TIME_INTERVAL 5.0f
 #define CAMERA_TIME_INTERVAL 2
-#define TEST_CAMERA_SAVE 0
-#define CAMERA_ENABLED 0
+#define TEST_CAMERA_SAVE 1
+#define CAMERA_ENABLED 1
+#define STEP_MOTOR_TIME 14.0f
+#define KEY_MATRIX_TIME 0.5f
+#define DC_MOTOR_TIME 1.0f
 
-static float timer_time = 0.5f;
+#define NOTE_C 261
+#define NOTE_D 294
+#define NOTE_E 330
+#define NOTE_F 349
+#define NOTE_G 392
+#define NOTE_A 440
+#define NOTE_B 494
 
 typedef struct app_data_s {
 	Ecore_Timer *getter_timer;
@@ -47,115 +56,156 @@ typedef struct app_data_s {
 
 typedef enum {
 	SETTING,
+	MOVE_ARM,
 	RUN_TIMER,
 	INPUT_PW,
 	RUN_MOTOR,
-	STOP_MOTOR
+	STOP_MOTOR,
+	MOVE_ARM_EX
 }smartbell_state_e;
 
-static void __resource_camera_capture_completed_cb(const void *image, unsigned int size, void *user_data)
-{
-	const char *path = NULL;
-	const char *url = NULL;
-
-	controller_util_get_path(&path);
-
-	controller_util_get_image_address(&url);
-
-	web_util_noti_post_image_data(url, path, image, size);
-
-#if TEST_CAMERA_SAVE
-	FILE *fp = NULL;
-	char *data_path = NULL;
-	char file[256];
-
-	data_path = app_get_data_path();
-
-	snprintf(file, sizeof(file), "%sjjoggoba.jpg", data_path);
-	free(data_path);
-	_D("File : %s", file);
-
-	fp = fopen(file, "w");
-	if (!fp) {
-		_E("Failed to open file: %s", file);
-		return;
-	}
-
-	if (fwrite(image, size, 1, fp) != 1) {
-		_E("Failed to write image to file");
-		return;
-	}
-
-	fclose(fp);
-#endif
-}
-
-double dist = 0;
-
-static void _ultrasonic_sensor_read_cb(double value, void *data)
-{
-	app_data *ad = data;
-
-#if 1
-	if (value < 0) {
-		_E("OUT OF RANGE");
-	} else {
-		_D("Measured Distance : %0.2fcm", value);
-
-//		if (connectivity_notify_double(ad->resource_info, "distance", value) == -1)
-//			_E("Cannot notify message");
-	}
-#endif
-
-	return;
-}
 static smartbell_state_e smartbell_state = SETTING;
-static int speed = 3500;
-static int cnt = 1;
+static int speed = 1500;
+static int cnt = 0;
+static Ecore_Timer* music_timer;
+//gggfa#
+double music[10][2] = {{784, 0.3f},{0, 0.1f}, {784, 0.3f}, {0, 0.1f},
+		{784, 0.2f},{0, 0.05f}, {705, 0.1f},{0, 0.05f}, {950, 0.3f}, {0, 0.0f}};
+double fail[2][2] = {{785, 1.0f}, {0, 0.0f}};
+void play_success()
+{
+	int i;
+	for(i=0; i<10; i++){
+		resource_set_passive_buzzer_value(8, music[i][0], music[i][1]);
+	}
+	ecore_timer_del(music_timer);
+}
+void play_fail()
+{
+	int i;
+	for(i=0; i<2; i++){
+		resource_set_passive_buzzer_value(8, fail[i][0], fail[i][1]);
+	}
+	ecore_timer_del(music_timer);
+}
+void setting_timer(float time, Ecore_Task_Cb func, app_data *ad){
+	ecore_timer_del(ad->getter_timer);
+	ad->getter_timer = ecore_timer_add(time, func, ad);
+}
+
 static Eina_Bool control_sensors_cb(void *data)
 {
 	app_data *ad = data;
 	int ret = -1;
+
+#if 1
 	switch(smartbell_state){
 	case SETTING:
-		if(input_order_num()==1){
+		ret = input_order_num();
+		if(ret==1){
+			music_timer = ecore_timer_add(0.5f, play_success, NULL);
+			//play_success();
+			smartbell_state = MOVE_ARM;
+			print_lcd("MOVE ARM", 0);
+			resource_pca9685_init(4);
+			resource_pca9685_set_value_to_channel(4, 0, 0);
+		}
+		else if(ret == -1)
+			music_timer = ecore_timer_add(0.5f, play_fail, NULL);
+		break;
+	case MOVE_ARM:
+		if(cnt == 0){
+			setting_timer(STEP_MOTOR_TIME, control_sensors_cb, ad);
+			narrow_arm();
+			cnt++;
+		}
+		else{
+			stop_arm();
+			resource_pca9685_fini(4);
+			cnt = 0;
 			smartbell_state = RUN_TIMER;
-			print_lcd("RUN TIMER");
+			setting_timer(KEY_MATRIX_TIME, control_sensors_cb, ad);
 		}
 		break;
 	case RUN_TIMER:
 		ret = run_timer();
 		if(ret == 1){
+			cnt = 0;
 			smartbell_state = RUN_MOTOR;
-			timer_time = 1.5f;
-			print_lcd("RUN MOTOR");
+			print_lcd("RUN MOTOR", 0);
 		}
 		else if(ret == 2){
 			smartbell_state = INPUT_PW;
-			print_lcd("INPUT PW");
+			print_lcd("INPUT PW", 0);
 		}
 		break;
 	case INPUT_PW:
-		if(input_password() == 1){
-			smartbell_state = RUN_MOTOR;
-			timer_time = 1.5f;
-			print_lcd("RUN MOTOR");
+		ret = input_password();
+		if(ret == 1){
+			cnt = 0;
+			music_timer = ecore_timer_add(0.5f, play_success, NULL);
+			smartbell_state = STOP_MOTOR;
+			print_lcd("IDLE_STATE", 0);
+			setting_timer(KEY_MATRIX_TIME, control_sensors_cb, ad);
+		}
+		else if (ret == -1){
+			music_timer = ecore_timer_add(0.5f, play_fail, NULL);
+			smartbell_state = RUN_TIMER;
 		}
 		break;
-	case RUN_MOTOR:
-		if(cnt%5 ==0)
-			smartbell_state = STOP_MOTOR;
-		else
+	case RUN_MOTOR: // 벨 누름
+		if(cnt==0)
+		{
+			setting_timer(DC_MOTOR_TIME, control_sensors_cb, ad);
+			start_dc_motor(3,-speed);
+			cnt++;
+		}
+		else if( cnt==1)
+		{
 			start_dc_motor(3,speed);
-		cnt++;
+			cnt++;
+		}
+		else {
+			stop_dc_motor(3);
+			smartbell_state = STOP_MOTOR;
+			print_lcd("IDLE_STATE", 0);
+			setting_timer(KEY_MATRIX_TIME, control_sensors_cb, ad);
+		}
 		break;
 	case STOP_MOTOR:
-		stop_dc_motor(3);
-		speed = -speed;
-		smartbell_state = RUN_MOTOR;
+		ret = input_unlock_password();
+		if(ret == 1)
+		{
+			cnt = 0;
+			music_timer = ecore_timer_add(0.5f, play_success, NULL);
+			print_lcd("UNLOCK", 0);
+			smartbell_state = MOVE_ARM_EX;
+		}
+		else if(ret == -1)
+			music_timer = ecore_timer_add(0.5f, play_fail, NULL);
+		break;
+	case MOVE_ARM_EX:
+		if(cnt == 0){
+			resource_pca9685_init(4);
+			resource_pca9685_set_value_to_channel(4, 0, 0);
+			setting_timer(STEP_MOTOR_TIME, control_sensors_cb, ad);
+			extend_arm();
+			cnt++;
+		}
+		else{
+			stop_arm();
+			resource_pca9685_fini(4);
+			cnt = 0;
+			smartbell_state = SETTING;
+			//print_lcd("IDLE STATE", 0);
+			print_lcd("INPUT ORDER NUM", 0);
+			setting_timer(KEY_MATRIX_TIME, control_sensors_cb, ad);
+		}
+		break;
+	default:
 		break;
 	}
-
+#endif
 
 	return ECORE_CALLBACK_RENEW;
 }
@@ -190,8 +240,11 @@ static bool service_app_create(void *data)
 	 * Creates a timer to call the given function in the given period of time.
 	 * In the control_sensors_cb(), each sensor reads the measured value or writes a specific value to the sensor.
 	 */
-	print_lcd("INPUT ORDER NUM");
-	ad->getter_timer = ecore_timer_add(timer_time, control_sensors_cb, ad);
+	resource_pca9685_init(8);
+	resource_pca9685_fini(8);
+	print_lcd("INPUT ORDER NUM", 0);
+	//ad->getter_timer = ecore_timer_add(timer_time, control_sensors_cb, ad);
+	ad->getter_timer = ecore_timer_add(KEY_MATRIX_TIME, control_sensors_cb, ad);
 	if (!ad->getter_timer) {
 		_E("Failed to add infrared motion getter timer");
 		return false;

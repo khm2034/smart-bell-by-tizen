@@ -10,14 +10,13 @@
 
     $data = file_get_contents('php://input');
     $arr = json_decode($data, TRUE);
-    $orderNum = $arr['orderNum'];
-    $result = mysqli_query($con, "SELECT * FROM order_info WHERE num = $orderNum");
-     $response = array();
+    $key = $arr['UNLOCK'];
+    $key = "'". $key. "'";
+    $result = mysqli_query($con, "SELECT * FROM manager WHERE m_key = $key");
+    $response = array();
     if( $row = mysqli_fetch_array($result))
     {
          $response["success"] = "1";
-         $response["password"] = $row["password"];
-         $response["btime"] = substr($row["btime"], 11, 8);
          echo json_encode($response);    
     }
     else

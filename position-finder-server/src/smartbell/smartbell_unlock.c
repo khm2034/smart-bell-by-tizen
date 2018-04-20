@@ -3,11 +3,11 @@
 #include "resource.h"
 #include "log.h"
 #include "webutil.h"
-char order_num[MAX_ORDER_NUM_LENGTH + 1];
-int order_num_idx = 0;
+char unlock_pw[MAX_UNLOCK_LENGTH + 1];
+int unlock_pw_idx = 0;
 static char getch=NULL;
 static flag;
-size_t post_callback(char *ptr, size_t size, size_t nmemb, void *userdata)
+size_t post_unlock_callback(char *ptr, size_t size, size_t nmemb, void *userdata)
 {
 	size_t res_size = 0;
 	JSON json = {0,};
@@ -19,8 +19,6 @@ size_t post_callback(char *ptr, size_t size, size_t nmemb, void *userdata)
 		parse_json(ptr, strlen(ptr), &json);
 		if(strcmp(get_string_json(&json, "success"), "1") == 0){
 			flag = 1;
-			set_password(get_string_json(&json, "password"));
-			set_time(get_string_json(&json, "btime"));
 		}
 		else
 			flag = 0;
@@ -29,7 +27,7 @@ size_t post_callback(char *ptr, size_t size, size_t nmemb, void *userdata)
 	return res_size;
 }
 
-int input_order_num()
+int input_unlock_password()
 {
 	getch=NULL;
 	resource_read_key_matrix(&getch);
@@ -43,45 +41,43 @@ int input_order_num()
 			break;
 		case 'C':
 			_D("init_pw clear");
-			order_num_idx = 0;
+			unlock_pw_idx = 0;
 
 			break;
 		case 'D':
 			_D("init_pw delete");
-			if(order_num_idx != 0){
-				order_num[--order_num_idx] ='\0';
-				print_lcd(order_num, 0);
+			if(unlock_pw_idx != 0){
+				unlock_pw[--unlock_pw_idx] ='\0';
+				print_lcd(unlock_pw, 0);
 			}
 			break;
 		case '#':
-			if(order_num_idx == 0)
-				print_lcd("PLEASE INPUT PW", 0);
+			if(unlock_pw_idx == 0)
+				print_lcd("PLEASE INPUT UNLOCK PW", 0);
 			else{
-				_D("set input init_pw");
 				print_lcd("", 0);
 				web_util_json_init();
 				web_util_json_begin();
-				web_util_json_add_string("orderNum", order_num);
+				web_util_json_add_string("UNLOCK", unlock_pw);
 				web_util_json_end();
-				custom_web_util_noti_post("115.68.229.127/getOrderInfo.php", web_util_get_json_string(), post_callback);
+				custom_web_util_noti_post("115.68.229.127/checkUnlock.php", web_util_get_json_string(), post_unlock_callback);
 				web_util_json_fini();
-				order_num_idx = 0;
+				unlock_pw_idx = 0;
 				if(flag)
 					return 1;
 				else{
-					order_num_idx = 0;
-					print_lcd("CHECK INPUT ORDER NUMBER", 0);
+					unlock_pw_idx = 0;
+					print_lcd("CHECK INPUT UNLOCK PW", 0);
 					return -1;
 				}
 			}
 			break;
 		default:
-			_D("init_pw input");
-			if(order_num_idx == MAX_ORDER_NUM_LENGTH)
+			if(unlock_pw_idx == MAX_UNLOCK_LENGTH)
 				break;
-			order_num[order_num_idx++] = getch;
-			order_num[order_num_idx] = '\0';
-			print_lcd(order_num, 0);
+			unlock_pw[unlock_pw_idx++] = getch;
+			unlock_pw[unlock_pw_idx] = '\0';
+			print_lcd(unlock_pw, 0);
 			break;
 		}
 	}

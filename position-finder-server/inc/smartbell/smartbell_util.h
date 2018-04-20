@@ -32,7 +32,7 @@ typedef struct _JSON {
 void delay_microseconds_hard (unsigned int how_long);
 void delay_microseconds (unsigned int how_long);
 void delay (unsigned int how_long);
-void print_lcd(char* s);
+void print_lcd(char* s, lcd_id_e id);
 void parse_json(char *doc, int size, JSON *json);
 void free_json(JSON *json);
 char* get_string_json(JSON *json, char *key);

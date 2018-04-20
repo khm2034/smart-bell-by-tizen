@@ -112,7 +112,7 @@ ERROR:
 	return -1;
 }
 
-int resource_set_key_matrix_gpio(unsigned int row1, unsigned int row2, unsigned int row3, unsigned int row4,
+int resource_set_key_matrix_configuration(unsigned int row1, unsigned int row2, unsigned int row3, unsigned int row4,
 		unsigned int col1, unsigned int col2, unsigned int col3, unsigned int col4)
 {
 	if(g_km_h.key_matrix_state == KEY_MATRIX_READY)
@@ -148,34 +148,28 @@ int resource_read_key_matrix(char* getch)
 //	}
 
 	for(i = 0; i < 4; i++){
-		//_D("read");
-		ret = peripheral_gpio_write(g_km_h.col_pin_h[i], 0);
+		ret = peripheral_gpio_write(g_km_h.col_pin_h[i], 1);
 		if(ret != PERIPHERAL_ERROR_NONE){
 			_E("failed to set value[0] col[%d] pin", i);
 			ret = -1;
 			return ret;
 		}
-		//usleep(10);
 		for(j = 0; j < 4; j++){
 			usleep(10);
 			peripheral_gpio_read(g_km_h.row_pin_h[j], &read);
-			//_D("col[%d], row[%d], read[%d]", i, j, read);
-			if(read == 0){
-				//_D("press [%c] key!!", key_matrix_value[j][i]);
+			if(read == 1){
 				*getch = key_matrix_value[j][i];
-//				do{
-//					peripheral_gpio_read(g_km_h.row_pin_h[j], &read);
-//				}while(read == 0);
+				do{
+					peripheral_gpio_read(g_km_h.row_pin_h[j], &read);
+				}while(read == 1);
 			}
 		}
-		//usleep(10);
-		ret = peripheral_gpio_write(g_km_h.col_pin_h[i], 1);
+		ret = peripheral_gpio_write(g_km_h.col_pin_h[i], 0);
 		if(ret != PERIPHERAL_ERROR_NONE){
 			_E("failed to set value[1] col[%d] pin", i);
 			ret = -1;
 			return ret;
 		}
-		//usleep(10);
 	}
 
 	return 0;

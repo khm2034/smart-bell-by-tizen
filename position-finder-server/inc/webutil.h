@@ -67,7 +67,7 @@ struct _web_util_sensor_data_s {
 
 int web_util_noti_init(void);
 void web_util_noti_fini(void);
-int custom_web_util_noti_post(const char *resource, const char *json_data, size_t post_callback);
+int custom_web_util_noti_post(const char *resource, const char *json_data, size_t (*callback_func)(char*, size_t, size_t, void*));
 int web_util_noti_post(const char *resource, const char *json_data);
 int web_util_noti_post_image_data(const char *url, const char *device_id,
 	const void *image_data, unsigned int image_size);

@@ -37,22 +37,23 @@ int input_password(){
 			_D("input_pw delete");
 			if(input_pw_idx != 0){
 				input_pw[--input_pw_idx] ='\0';
-				print_lcd(input_pw);
+				print_lcd(input_pw, 0);
 			}
 			break;
 		case '#':
 			if(input_pw_idx == 0)
-				print_lcd("PLEASE INPUT PW");
+				print_lcd("PLEASE INPUT PW", 0);
 				//_D("please input input_pw");
 			else{
 				if(strcmp(init_pw, input_pw)){
-					print_lcd("CHECK INPUT PW");
+					print_lcd("CHECK INPUT PW", 0);
 					//_D("check input_pw");
 					input_pw_idx = 0;
-					return 0;
+					return -1;
 				}
 				else{
-					print_lcd("UNLOCK");
+					print_lcd("UNLOCK", 0);
+					input_pw_idx = 0;
 					return 1;
 				}
 			}
@@ -63,7 +64,7 @@ int input_password(){
 				break;
 			input_pw[input_pw_idx++] = getch;
 			input_pw[input_pw_idx] = '\0';
-			print_lcd(input_pw);
+			print_lcd(input_pw, 0);
 			break;
 		}
 	}

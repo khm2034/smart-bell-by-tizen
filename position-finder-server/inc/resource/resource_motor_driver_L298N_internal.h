@@ -18,8 +18,10 @@
 
 #ifndef __RESOURCE_MOTOR_DRIVER_L298N_INTERNAL_H__
 #define __RESOURCE_MOTOR_DRIVER_L298N_INTERNAL_H__
-
-void resource_close_motor_driver_L298N(motor_id_e id);
-void resource_close_motor_driver_L298N_all(void);
+#include "resource/resource_motor_driver_L298N.h"
+void resource_close_dc_motor_driver_L298N(motor_id_e id);
+void resource_close_stepper_motor_driver_L298N(step_motor_id_e id);
+void resource_close_dc_motor_driver_L298N_all(void);
+void resource_close_stepper_motor_driver_L298N_all(void);
 
 #endif /* __RESOURCE_MOTOR_DRIVER_L298N_INTERNAL_H__ */

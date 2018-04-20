@@ -209,7 +209,8 @@ int web_util_noti_post_image_data(const char *url, const char *device_id,
 	return ret;
 }
 
-int custom_web_util_noti_post(const char *resource, const char *json_data, size_t post_callback)
+int custom_web_util_noti_post(const char *resource, const char *json_data,
+		size_t (*callback_func)(char*, size_t, size_t, void*))
 {
 	int ret = 0;
 	CURL *curl = NULL;
@@ -235,7 +236,7 @@ int custom_web_util_noti_post(const char *resource, const char *json_data, size_
 	curl_easy_setopt(curl, CURLOPT_POST, 1L);
 	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
 	curl_easy_setopt(curl, CURLOPT_POSTFIELDS, json_data);
-	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, post_callback);
+	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, callback_func);
 	curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, REQ_CON_TIMEOUT);
 	curl_easy_setopt(curl, CURLOPT_TIMEOUT, REQ_TIMEOUT);
 

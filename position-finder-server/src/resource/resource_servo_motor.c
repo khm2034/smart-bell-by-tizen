@@ -18,7 +18,7 @@
 
 #include "log.h"
 #include "resource/resource_PCA9685.h"
-
+#include "resource/resource_servo_motor.h"
 #define SERVO_MOTOR_MAX PCA9685_CH_MAX
 
 static int servo_motor_index[SERVO_MOTOR_MAX + 1] = {0, };
@@ -26,7 +26,9 @@ static int servo_motor_index[SERVO_MOTOR_MAX + 1] = {0, };
 static int resource_servo_motor_init(unsigned int ch)
 {
 	int ret = 0;
+	_D("test3");
 	ret = resource_pca9685_init(ch);
+	_D("test4");
 	if (ret) {
 		_E("failed to init PCA9685 with ch[%u]", ch);
 		return -1;
@@ -69,7 +71,8 @@ int resource_set_servo_motor_value(unsigned int motor_id, int value)
 			return -1;
 	}
 
+	_D("test1");
 	ret = resource_pca9685_set_value_to_channel(motor_id, 0, value);
-
+	_D("test2");
 	return ret;
 }

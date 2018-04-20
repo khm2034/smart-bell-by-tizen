@@ -1,6 +1,5 @@
 #include "smartbell/smartbell_util.h"
-
-static int lcd;
+#include "resource.h"
 
 void delay_microseconds_hard (unsigned int how_long)
 {
@@ -41,22 +40,12 @@ void delay (unsigned int how_long){
 	nanosleep (&sleeper, &dummy) ;
 }
 
-void print_lcd(char* s){
+void print_lcd(char* s, lcd_id_e id){
 	resource_close_key_matrix();
-	lcd = resource_1602A_LCD_init(2, 16, 8, LCD_RS, LCD_E, LCD_D0, LCD_D1, LCD_D2
-			, LCD_D3, LCD_D4, LCD_D5, LCD_D6, LCD_D7);
-	resource_1602A_LCD_position(lcd, 0, 0);
-	if(strlen(s) <= 16)
-		resource_1602A_LCD_puts(lcd, s);
-	else {
-		char s1[17]={0,}; memcpy(s1, s, 16);
-		char s2[17]={0,}; memcpy(s2, s+16, strlen(s)-16);
-		resource_1602A_LCD_position(lcd, 0, 0);
-		resource_1602A_LCD_puts(lcd, s1);
-		resource_1602A_LCD_position(lcd, 0, 1);
-		resource_1602A_LCD_puts(lcd, s2);
-	}
-	resource_1602A_LCD_close();
+	resource_set_1602A_LCD_configuration(0, 2, 16, 4, 27, 22, 6, 13, 19, 26, 0, 0, 0, 0);
+	resource_1602A_LCD_position(id, 0, 0);
+	resource_1602A_LCD_puts(id, s);
+	resource_1602A_LCD_close(id);
 }
 
 void parse_json(char *doc, int size, JSON *json){

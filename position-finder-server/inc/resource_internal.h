@@ -37,7 +37,12 @@
 #include "resource/resource_tilt_sensor_internal.h"
 #include "resource/resource_gas_detection_sensor_internal.h"
 #include "resource/resource_sound_level_sensor_internal.h"
-#include "resource/resource_buzzer_internal.h"
+#include "resource/resource_servo_motor_internal.h"
+#include "resource/resource_motor_driver_ULN2003_internal.h"
+#include "resource/resource_motor_driver_L298N_internal.h"
+#include "resource/resource_1602A_LCD_internal.h"
+#include "resource/resource_active_buzzer_internal.h"
+#include "resource/resource_passive_buzzer_internal.h"
 #define PIN_MAX 40
 
 struct _resource_s {

@@ -24,7 +24,6 @@
 //#include <stdio.h>
 //#include <stdlib.h>
 //#include <tizen.h>
-//
 //#include "log.h"
 //#include "resource/resource_camera.h"
 //

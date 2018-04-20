@@ -46,6 +46,9 @@ int run_timer()
 	cur_time = t->tm_hour*10000 + t->tm_min*100 + t->tm_sec;
 	_D("cur : %d", cur_time);
 	if(cur_time >= order_time)
+	{
+		order_time= 0;
 		return 1;
+	}
 	return 0;
 }

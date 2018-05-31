@@ -8,4 +8,5 @@
 #include "smartbell/smartbell_timer.h"
 #include "smartbell/smartbell_util.h"
 #include "smartbell/smartbell_unlock.h"
+#include "smartbell/smartbell_socket.h"
 #endif

@@ -92,13 +92,22 @@ void setting_timer(float time, Ecore_Task_Cb func, app_data *ad){
 	ecore_timer_del(ad->getter_timer);
 	ad->getter_timer = ecore_timer_add(time, func, ad);
 }
-
+char d[100] = "123";
 static Eina_Bool control_sensors_cb(void *data)
 {
 	app_data *ad = data;
 	int ret = -1;
+	if(!cnt){
+		//smart_bell_socket_connect(d);
+		web_util_json_init();
+		web_util_json_begin();
+		web_util_json_add_string("data", d);
+		web_util_json_end();
+		web_util_noti_post("115.68.229.127/send_data.php", web_util_get_json_string());
+		web_util_json_fini();
+	}
 
-#if 1
+#if 0
 	switch(smartbell_state){
 	case SETTING:
 		ret = input_order_num();
@@ -240,9 +249,10 @@ static bool service_app_create(void *data)
 	 * Creates a timer to call the given function in the given period of time.
 	 * In the control_sensors_cb(), each sensor reads the measured value or writes a specific value to the sensor.
 	 */
-	resource_pca9685_init(8);
-	resource_pca9685_fini(8);
+	//resource_pca9685_init(8);
+	//resource_pca9685_fini(8);
 	print_lcd("INPUT ORDER NUM", 0);
+
 	//ad->getter_timer = ecore_timer_add(timer_time, control_sensors_cb, ad);
 	ad->getter_timer = ecore_timer_add(KEY_MATRIX_TIME, control_sensors_cb, ad);
 	if (!ad->getter_timer) {
